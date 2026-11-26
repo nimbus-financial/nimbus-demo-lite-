@@ -1,0 +1,33 @@
+#cloud-config
+# nimbus-demo-lite host bootstrap. All data on this host is SYNTHETIC.
+write_files:
+  - path: /opt/nimbus/payment-api/app.py
+    encoding: gz+b64
+    permissions: "0644"
+    content: ${app_py}
+  - path: /opt/nimbus/payment-api/nginx-modern.conf
+    encoding: gz+b64
+    permissions: "0644"
+    content: ${nginx_modern}
+  - path: /opt/nimbus/legacy-core/nginx-legacy.conf
+    encoding: gz+b64
+    permissions: "0644"
+    content: ${nginx_legacy}
+  - path: /opt/nimbus/legacy-core/legacy_client.py
+    encoding: gz+b64
+    permissions: "0644"
+    content: ${legacy_client}
+  - path: /opt/nimbus/mysql/seed.sql
+    encoding: gz+b64
+    permissions: "0644"
+    content: ${mysql_seed}
+  - path: /opt/nimbus/docker-compose.yml
+    encoding: gz+b64
+    permissions: "0600"
+    content: ${docker_compose}
+  - path: /opt/nimbus/bootstrap.sh
+    encoding: gz+b64
+    permissions: "0755"
+    content: ${bootstrap}
+runcmd:
+  - [bash, /opt/nimbus/bootstrap.sh]

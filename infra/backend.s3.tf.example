@@ -1,0 +1,12 @@
+# Optional remote state. To use it:
+#   1. Create an S3 bucket (versioned, encrypted) in your demo account.
+#   2. Replace the contents of backend.tf with this block.
+#   3. Create a backend config file (e.g. C:\nimbus-secure\backend.hcl):
+#        bucket       = "my-tfstate-bucket"
+#        key          = "nimbus-demo-lite/terraform.tfstate"
+#        region       = "us-east-1"
+#        use_lockfile = true
+#   4. Set TF_BACKEND_CONFIG to that file in deploy.env and re-run deploy.
+terraform {
+  backend "s3" {}
+}

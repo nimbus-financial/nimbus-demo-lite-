@@ -1,0 +1,33 @@
+id,resource,terraform_or_file,layer,algorithm_or_protocol,posture,severity,category,notes
+GT-01,KMS key alias/<prefix>-data,infra/kms.tf aws_kms_key.data,cloud-kms,AES-256 (SYMMETRIC_DEFAULT) with rotation,modern,info,crypto-inventory,Encrypts RDS / S3 / DynamoDB / Secrets / SSM
+GT-02,KMS key alias/<prefix>-partner-rsa2048,infra/kms.tf aws_kms_key.partner_signing,cloud-kms,RSA-2048 SIGN_VERIFY,quantum-vulnerable,medium,pqc-migration,Partner signing; RSA is broken by CRQC
+GT-03,KMS key alias/<prefix>-token-p256,infra/kms.tf aws_kms_key.token_signing,cloud-kms,ECC NIST P-256 SIGN_VERIFY (ECDSA_SHA_256),quantum-vulnerable,medium,pqc-migration,Used by payment-api for token signing
+GT-04,KMS key alias/<prefix>-pq-signing,infra/kms.tf aws_kms_key.pq_signing,cloud-kms,ML-DSA-65 SIGN_VERIFY (FIPS 204),post-quantum,info,crypto-inventory,PQ_KEY_SPEC can switch to ML_DSA_44/87 or ECC_NIST_P384/RSA_4096
+GT-05,Secrets Manager <prefix>/rds/master,infra/secrets.tf,cloud-secrets,KMS AES-256 (CMK),modern,info,secrets-inventory,RDS master credentials
+GT-06,Secrets Manager <prefix>/webhooks/hmac,infra/secrets.tf,cloud-secrets,HMAC-SHA256 shared secret,modern,info,secrets-inventory,Partner webhook signing secret; no rotation configured
+GT-07,Secrets Manager <prefix>/acquirer/api-key,infra/secrets.tf,cloud-secrets,API key (KMS AES-256),modern,low,secrets-inventory,No rotation configured
+GT-08,SSM /<prefix>/partner/config,infra/secrets.tf,cloud-secrets,SecureString (KMS CMK),modern,info,secrets-inventory,References RSA-2048 signing alias
+GT-09,RDS <prefix>-ledger,infra/data.tf,cloud-data,Postgres 16; storage KMS AES-256; rds.force_ssl=1,modern,info,data-at-rest,Private; TLS enforced in transit
+GT-10,S3 <prefix>-data<suffix>,infra/data.tf,cloud-data,SSE-KMS (CMK) + bucket key; public access blocked,modern,info,data-at-rest,Contains synthetic settlement CSV
+GT-11,DynamoDB <prefix>-payment-tokens,infra/data.tf,cloud-data,SSE-KMS (CMK),modern,info,data-at-rest,No PITR (demo)
+GT-12,Cognito <prefix>-consumers,infra/identity.tf,cloud-identity,Cognito hosted UI (AWS-managed TLS),modern,info,identity,Admin-create-only user pool
+GT-13,CloudFront distribution,infra/edge.tf,cloud-edge,Default *.cloudfront.net cert; viewer min protocol TLSv1,legacy,medium,weak-tls,No custom domain so TLSv1 policy is forced
+GT-14,CloudFront -> EC2 origin,infra/edge.tf,cloud-edge,HTTP-only origin on :8080,legacy,medium,plaintext-in-transit,Origin locked to CloudFront prefix list
+GT-15,API Gateway <prefix>-webhooks,infra/serverless.tf,cloud-serverless,TLS 1.2 (AWS-managed) + HMAC-SHA256 request signing,modern,info,crypto-inventory,POST /webhooks/partner
+GT-16,Lambda <prefix>-quick-export Function URL,infra/serverless.tf,cloud-serverless,Function URL auth NONE,legacy,high,unauthenticated-endpoint,Publicly invokable; synthetic merchant data
+GT-17,EBS volume <prefix>-legacy-data (20 GB),infra/compute.tf,cloud-compute,No encryption at rest,legacy,high,data-at-rest,Acquired-bank volume mounted at /data/legacy
+GT-18,EC2 user_data,infra/compute.tf + templates/docker-compose.yml.tftpl,cloud-compute,MySQL root password in plaintext user_data,legacy,high,hardcoded-secret,Readable by anyone with ec2:DescribeInstanceAttribute
+GT-19,Host :443 modern-tls (nginx 1.27),apps/payment-api/nginx-modern.conf,runtime-tls,TLS 1.3 only; ECDSA P-256 / SHA-256 self-signed cert; X25519,modern,low,crypto-inventory,Self-signed cert (demo); classical key exchange (no hybrid PQ KEM)
+GT-20,Host :8443 legacy-core (nginx 1.14 / OpenSSL 1.1.0),apps/legacy-core/nginx-legacy.conf,runtime-tls,TLS 1.0/1.1; DES-CBC3-SHA; AES-CBC-SHA; no forward secrecy,legacy,critical,weak-tls,SWEET32 / BEAST exposure
+GT-21,Host :8443 legacy certificate,infra/templates/bootstrap.sh.tftpl,runtime-cert,RSA-1024 / SHA-1 self-signed; 10-year validity,legacy,critical,weak-certificate,Generated at boot
+GT-22,Host :3306 legacy-mysql (MySQL 5.7),infra/network.tf + docker-compose,runtime-db,Exposed to ALLOWED_CIDR; MySQL 5.7 EOL,legacy,high,exposed-service,Only when ENABLE_LEGACY_EXPOSURE=true
+GT-23,corebank.accounts.pin_md5,apps/legacy-core/mysql-seed.sql,data,MD5-hashed PINs,legacy,high,weak-hash,Synthetic rows
+GT-24,corebank.card_vault.pan_3des,apps/legacy-core/mysql-seed.sql,data,3DES-encrypted PAN column,legacy,high,weak-cipher,Synthetic rows
+GT-25,legacy_client.record_checksum,apps/legacy-core/legacy_client.py,code,MD5,legacy,high,weak-hash,hashlib.md5
+GT-26,legacy_client.batch_fingerprint,apps/legacy-core/legacy_client.py,code,SHA-1,legacy,medium,weak-hash,hashlib.sha1
+GT-27,legacy_client.legacy_tls_context,apps/legacy-core/legacy_client.py,code,TLSv1 client; CERT_NONE; DES-CBC3-SHA,legacy,critical,weak-tls,Verification disabled
+GT-28,legacy_client.KEYSTORE_PASSWORD,apps/legacy-core/legacy_client.py,code,Hardcoded keystore password,legacy,high,hardcoded-secret,Synthetic value
+GT-29,payment-api.checkout,apps/payment-api/app.py,code,SHA-256 + HMAC-SHA256 + KMS ECDSA_SHA_256 (P-256),modern,info,crypto-inventory,ECDSA is quantum-vulnerable (pairs with GT-03)
+GT-30,webhook_receiver.handler,apps/webhooks/webhook_receiver.py,code,HMAC-SHA256 with constant-time compare,modern,info,crypto-inventory,Secret from Secrets Manager
+GT-31,quick_export.handler,apps/webhooks/quick_export.py,code,No authentication (served via GT-16),legacy,high,unauthenticated-endpoint,Synthetic data only
+GT-32,EC2 root volume,infra/compute.tf,cloud-compute,EBS encryption (aws/ebs AES-256); IMDSv2 required,modern,info,data-at-rest,Contrast with GT-17
